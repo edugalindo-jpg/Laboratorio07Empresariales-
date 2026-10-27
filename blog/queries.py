@@ -3,8 +3,14 @@ from blog.models import Post
 
 
 def posts_for_front_page():
-    # TODO(team): this works, but the template walks `post.author` and
-    # `post.tags` once per post, so the number of queries grows with the number
-    # of posts (the N+1 problem). Fix it here so the test in
-    # blog/tests/test_front_page.py goes from red to green.
-    return Post.objects.filter(published=True).order_by("-published_at")
+    # The template walks `post.author` (FK) and `post.tags` (M2M) per post, so a
+    # plain queryset fires one extra query per post (N+1). `select_related`
+    # joins the author into the posts query, and `prefetch_related` fetches all
+    # tag rows in a second query, caching them on every post: 2 queries total,
+    # independent of the number of posts.
+    return (
+        Post.objects.filter(published=True)
+        .select_related("author")
+        .prefetch_related("tags")
+        .order_by("-published_at")
+    )
